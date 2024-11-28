@@ -9,65 +9,81 @@ import com.revrobotics.SparkAbsoluteEncoder.Type;
 import frc.robot.Constants;
 import frc.robot.Constants.ElectricalLayout;
 
+// In elevatorIOSparkMax, we actually implement the functionalities of the functions defined in ElevatorIO for real-life hardware
 public class ElevatorIOSparkMax implements ElevatorIO {
-    // Motors and encoders
+    // We need a way of representing our motors and encoders in the code
+    // CANSparkMax represents a motor
+    // AbsoluteEncoder represents an encoder (a sensor that tells you the motor's position and velocity)
     private CANSparkMax elevatorMotor, elevatorFollower;
     private AbsoluteEncoder encoder;
 
-    private double setpoint = 0;
+    private double setpoint = 0; // The setpoint mentioned in ElevatorIO
 
     public ElevatorIOSparkMax() {
-        elevatorMotor = new CANSparkMax(ElectricalLayout.ELEVATOR_MOTOR_ID, MotorType.kBrushless);
-        elevatorFollower = new CANSparkMax(ElectricalLayout.ELEVATOR_FOLLOWER_ID, MotorType.kBrushless);
+        // Set up elevator motors
+        elevatorMotor = new CANSparkMax(ElectricalLayout.ELEVATOR_MOTOR_ID, MotorType.kBrushless); // Main motor
+        elevatorFollower = new CANSparkMax(ElectricalLayout.ELEVATOR_FOLLOWER_ID, MotorType.kBrushless); // This motor will follow the main motor
 
+        // Restore motor settings to factory default
         elevatorMotor.restoreFactoryDefaults();
         elevatorFollower.restoreFactoryDefaults();
 
-        elevatorFollower.follow(elevatorMotor, true);
+        elevatorFollower.follow(elevatorMotor, true); // Now whatever you do to elevatorMotor will copy to elevatorFollower
 
+        // We need the motors to resist any movement when they're idle
         elevatorMotor.setIdleMode(IdleMode.kBrake);
         elevatorFollower.setIdleMode(IdleMode.kBrake);
 
+        // Our motors run at 12V
         elevatorMotor.enableVoltageCompensation(12.0);
 
+        // Set a current limit so we don't burn the motors or do anything unspeakable to them
         elevatorMotor.setSmartCurrentLimit(Constants.NEO_CURRENT_LIMIT);
         elevatorFollower.setSmartCurrentLimit(Constants.NEO_CURRENT_LIMIT);
 
+        // Actually writes the settings to the motors
         elevatorMotor.burnFlash();
         elevatorFollower.burnFlash();
 
         // Encoder setup
         encoder = elevatorMotor.getAbsoluteEncoder(Type.kDutyCycle);
 
-        encoder.setPositionConversionFactor(ElevatorConstants.POSITION_CONVERSION_FACTOR);
-        encoder.setVelocityConversionFactor(ElevatorConstants.POSITION_CONVERSION_FACTOR / 60.0);
+        encoder.setPositionConversionFactor(ElevatorConstants.POSITION_CONVERSION_FACTOR); // Changes position units from motor rotations to meters
+        encoder.setVelocityConversionFactor(ElevatorConstants.POSITION_CONVERSION_FACTOR / 60.0); // Changes velocity units from RPM to meters/sec
     }
-    
+
+    // Update the inputs (mentioned in ElevatorIO) in real time
     @Override
     public void updateInputs(ElevatorIOInputs inputs) {
-        inputs.lengthMeters = getLength();
-        inputs.velocityMetersPerSec = getVelocity();
-        inputs.appliedVolts = elevatorMotor.getBusVoltage() * elevatorMotor.getAppliedOutput();
-        inputs.setpointMeters = setpoint;
-        inputs.currentAmps = new double[] { elevatorMotor.getOutputCurrent(), elevatorFollower.getOutputCurrent() };
-        inputs.tempCelsius = new double[] { elevatorMotor.getMotorTemperature(), elevatorFollower.getMotorTemperature() };
+        inputs.lengthMeters = getLength(); // getLength() returns length in meters
+        inputs.velocityMetersPerSec = getVelocity(); // getVelocity() returns velocity in meters/sec
+        inputs.appliedVolts = elevatorMotor.getBusVoltage() * elevatorMotor.getAppliedOutput(); // getBusVoltage() returns the maximum voltage of the motors (12), getAppliedOutput() returns the percentage of that voltage we're using
+        inputs.setpointMeters = setpoint; // setpoint tracks our setpoint
+        inputs.currentAmps = new double[] { elevatorMotor.getOutputCurrent(), elevatorFollower.getOutputCurrent() }; // An array containing the currents of both motors
+        inputs.tempCelsius = new double[] { elevatorMotor.getMotorTemperature(), elevatorFollower.getMotorTemperature() }; // An array containing the temperatures of both motors
     }
 
     @Override
     public void setVelocity(double velocity) {
-        elevatorMotor.set(velocity);
+        elevatorMotor.set(velocity); // Good code needs no comments because it explains itself
     }
 
     @Override
     public double getLength() {
-        return encoder.getPosition() + ElevatorConstants.ELEVATOR_OFFSET;
+        return encoder.getPosition() + ElevatorConstants.ELEVATOR_OFFSET; // Same here
     }
 
     @Override
     public double getVelocity() {
-        return encoder.getVelocity();
+        return encoder.getVelocity(); // Same here
     }
 
+    // This one is a bit trickier
+    // If elevator is at setpoint, don't do anything
+    // Else if elevator is shorter than setpoint, set velocity to something positive (extend the elevator)
+    // Else, set velocity to something negative (retract the elevator)
+    // This is called Bang-Bang Control
+    // PID is better, we will explain how to code PID instead later
     @Override
     public void goToSetpoint(double setpoint) {
         this.setpoint = setpoint;
@@ -81,6 +97,7 @@ public class ElevatorIOSparkMax implements ElevatorIO {
         }
     }
 
+    // If the difference between the length of the arm and the setpoint is small enough, then you're at the setpoint
     @Override
     public boolean atSetpoint() {
         return Math.abs(setpoint - getLength()) < ElevatorConstants.SETPOINT_TOLERANCE;
