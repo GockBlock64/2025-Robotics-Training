@@ -18,6 +18,11 @@ import frc.robot.subsystems.drive.DriveIOCIM;
 import frc.robot.subsystems.drive.DriveIOSim;
 import frc.robot.subsystems.drive.DriveIOTalon;
 import frc.robot.subsystems.drive.GyroIOReal;
+import frc.robot.subsystems.elevator.Elevator;
+import frc.robot.subsystems.elevator.ElevatorConstants;
+import frc.robot.subsystems.elevator.ElevatorIO;
+import frc.robot.subsystems.elevator.ElevatorIOSim;
+import frc.robot.subsystems.elevator.ElevatorIOSparkMax;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhoton;
 import frc.robot.subsystems.vision.VisionIOSim;
@@ -51,6 +56,7 @@ import java.io.File;
 public class RobotContainer {
   // Subsystems
   private final Drive drive;
+  private final Elevator elevator;
 
   private Mechanism2d mech = new Mechanism2d(3, 3);
 
@@ -71,19 +77,23 @@ public class RobotContainer {
       // Real robot, instantiate hardware IO implementations
       case REAL:
         drive = new Drive(new DriveIOTalon(), new VisionIOPhoton(), new Pose2d());
+        elevator = new Elevator(new ElevatorIOSparkMax());
         break;
 
       // Sim robot, instantiate physics sim IO implementations
       case SIM:
         drive = new Drive(new DriveIOSim(), new VisionIOSim(), new Pose2d());
+        elevator = new Elevator(new ElevatorIOSim());
         break;
       case TEST:
         drive = new Drive(new DriveIOCIM(), new VisionIOPhoton(), new Pose2d());
+        elevator = new Elevator(new ElevatorIOSim());
         break;
 
       // Replayed robot, disable IO implementations
       default:
         drive = new Drive(new DriveIO() {}, new VisionIO() {}, new Pose2d());
+        elevator = new Elevator(new ElevatorIO() {});
         break;
     }
 
@@ -91,6 +101,8 @@ public class RobotContainer {
 
     MechanismRoot2d root = mech.getRoot("elevator", 1, 0.5);
     // add subsystem mechanisms
+    elevator.setMechanism(root.append(elevator.getMechanism()));
+
     SmartDashboard.putData("Arm Mechanism", mech);
 
     isBlue = DriverStation.getAlliance().equals(DriverStation.Alliance.Blue);
@@ -117,6 +129,14 @@ public class RobotContainer {
 
     driver.rightBumper().onTrue(
       new StartEndCommand(() -> drive.startSlowMode(), () -> drive.stopSlowMode(), drive)
+    );
+
+    operator.b().onTrue(
+      elevator.moveToSetpoint(ElevatorConstants.ELEVATOR_MAX_LENGTH)
+    );
+
+    operator.a().onTrue(
+      elevator.moveToSetpoint(ElevatorConstants.ELEVATOR_MIN_LENGTH)
     );
 
     // cancel trajectory

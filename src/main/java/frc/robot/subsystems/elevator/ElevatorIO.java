@@ -38,4 +38,14 @@ public interface ElevatorIO {
 
     // Returns true if the arm is at the setpoint, false if it is not
     public default boolean atSetpoint() { return false; }
+
+    // PID constant setters
+    public default void setP(double p) {}
+    public default void setI(double i) {}
+    public default void setD(double D) {}
+
+    // PID constant getters
+    public default double getP() { return 0; }
+    public default double getI() { return 0; }
+    public default double getD() { return 0; }
 }

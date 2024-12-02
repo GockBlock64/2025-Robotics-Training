@@ -2,6 +2,8 @@ package frc.robot.subsystems.elevator;
 
 import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.CANSparkMax;
+import com.revrobotics.SparkPIDController;
+import com.revrobotics.CANSparkBase.ControlType;
 import com.revrobotics.CANSparkBase.IdleMode;
 import com.revrobotics.CANSparkLowLevel.MotorType;
 import com.revrobotics.SparkAbsoluteEncoder.Type;
@@ -16,6 +18,7 @@ public class ElevatorIOSparkMax implements ElevatorIO {
     // AbsoluteEncoder represents an encoder (a sensor that tells you the motor's position and velocity)
     private CANSparkMax elevatorMotor, elevatorFollower;
     private AbsoluteEncoder encoder;
+    private SparkPIDController pidController;
 
     private double setpoint = 0; // The setpoint mentioned in ElevatorIO
 
@@ -50,6 +53,13 @@ public class ElevatorIOSparkMax implements ElevatorIO {
 
         encoder.setPositionConversionFactor(ElevatorConstants.POSITION_CONVERSION_FACTOR); // Changes position units from motor rotations to meters
         encoder.setVelocityConversionFactor(ElevatorConstants.POSITION_CONVERSION_FACTOR / 60.0); // Changes velocity units from RPM to meters/sec
+
+        // PID setup
+        pidController = elevatorMotor.getPIDController();
+
+        pidController.setP(ElevatorConstants.P_REAL);
+        pidController.setI(ElevatorConstants.I_REAL);
+        pidController.setD(ElevatorConstants.D_REAL);
     }
 
     // Update the inputs (mentioned in ElevatorIO) in real time
@@ -86,20 +96,44 @@ public class ElevatorIOSparkMax implements ElevatorIO {
     // PID is better, we will explain how to code PID instead later
     @Override
     public void goToSetpoint(double setpoint) {
-        this.setpoint = setpoint;
-        if(atSetpoint()) {
-        }
-        else if(getLength() < setpoint) {
-            setVelocity(ElevatorConstants.ELEVATOR_SPEED);
-        }
-        else {
-            setVelocity(-ElevatorConstants.ELEVATOR_SPEED);
-        }
+        pidController.setReference(setpoint, ControlType.kPosition);
     }
 
     // If the difference between the length of the arm and the setpoint is small enough, then you're at the setpoint
     @Override
     public boolean atSetpoint() {
         return Math.abs(setpoint - getLength()) < ElevatorConstants.SETPOINT_TOLERANCE;
+    }
+
+    // PID constant setters
+    @Override
+    public void setP(double p) {
+        pidController.setP(p);
+    }
+    
+    @Override
+    public void setI(double i) {
+        pidController.setI(i);
+    }
+    
+    @Override
+    public void setD(double d) {
+        pidController.setD(d);
+    }
+
+    // PID constant getters
+    @Override
+    public double getP() {
+        return pidController.getP();
+    }
+    
+    @Override
+    public double getI() {
+        return pidController.getI();
+    }
+    
+    @Override
+    public double getD() {
+        return pidController.getD();
     }
 }
